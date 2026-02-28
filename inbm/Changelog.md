@@ -3,6 +3,17 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
+## 3.0.15.1 - 2023-06-20
+
+### Fixed
+
+ - RTC 530482 - Remove 'force' options in OTA's. 
+
+### NOTE:
+
+ - This is a hotfix release to remove the "-f (force)" argument from reboot commands in INBM. Sometimes "-f" can cause problems with some systems coming back up from reboot.
+ - This release does not include some updates to 3rd party components that have been included in INBM, versions 4.0.0 or later.
+
 ## 3.0.15 - 2023-04-14
 
 ### Added
