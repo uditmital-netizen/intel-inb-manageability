@@ -72,7 +72,11 @@ jobs:
       - name: Show resolved PR URL
         run: echo "Running compare_reviews.py against ${{ steps.pr_url.outputs.url }}"
 
-      # ── Checkout qodo-ai/pr-agent (provides pr_agent.* Python package) ─────
+      # ── Checkout this repo (intel-inb-manageability) — has compare_reviews.py
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── Checkout qodo-ai/pr-agent (provides pr_agent.* Python package only) ─
       - name: Checkout qodo-ai/pr-agent
         uses: actions/checkout@v4
         with:
@@ -102,7 +106,6 @@ jobs:
 
       # ── Run the comparison ─────────────────────────────────────────────────
       - name: Run compare_reviews.py
-        working-directory: _pr_agent_lib
         env:
           PR_URL:         ${{ steps.pr_url.outputs.url }}
           GITHUB_TOKEN:   ${{ secrets.GITHUB_TOKEN }}
@@ -112,6 +115,6 @@ jobs:
           TINKER_API_KEY: ${{ secrets.TINKER_API_KEY }}
           NEOSMITH_MODEL: ${{ vars.NEOSMITH_MODEL || 'gpt-oss-120b' }}
         run: |
-          python compare_reviews.py \
+          python scripts/compare_reviews.py \
             --pr_url "$PR_URL" \
             --openai_model "$OPENAI_MODEL"
