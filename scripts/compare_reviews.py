@@ -211,7 +211,7 @@ class CapturingImprover(PRCodeSuggestions):
 # ─────────────────────────────────────────────────────────────────────────────
 
 async def run_review(pr_url, handler_class):
-    breakpoint()
+  
     t0       = time.perf_counter()
     reviewer = CapturingReviewer(pr_url, ai_handler=handler_class)
     result   = await reviewer.get_review()
@@ -318,7 +318,7 @@ async def main():
     gpt_im_cost  = calc_cost(gpt_im_in,  gpt_im_out,  GPT_INPUT_PRICE, GPT_OUTPUT_PRICE)
     neo_rv_cost  = calc_cost(neo_rv_in,  neo_rv_out,  NEO_INPUT_PRICE, NEO_OUTPUT_PRICE)
     neo_im_cost  = calc_cost(neo_im_in,  neo_im_out,  NEO_INPUT_PRICE, NEO_OUTPUT_PRICE)
-    breakpoint()
+   
     gpt_total_cost = gpt_rv_cost + gpt_im_cost
     neo_total_cost = neo_rv_cost + neo_im_cost
     savings        = gpt_total_cost - neo_total_cost
