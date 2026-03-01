@@ -140,23 +140,32 @@ class NeosmithHandler(BaseAiHandler):
 
     def _blocking_sample(self, model_input, temperature: float) -> str:
         """Synchronous Tinker call — runs in a thread pool."""
-        params = self._types.SamplingParams(
-            max_tokens=2048,
-            temperature=temperature,
-            stop=self._renderer.get_stop_sequences(),
-        )
-        result = self._sampling_client.sample(
-            prompt=model_input, num_samples=1, sampling_params=params
-        ).result()
+        print(f"  [Neosmith] _blocking_sample called, input_tokens={len(model_input)}")
+        try:
+            params = self._types.SamplingParams(
+                max_tokens=2048,
+                temperature=temperature,
+                stop=self._renderer.get_stop_sequences(),
+            )
+            result = self._sampling_client.sample(
+                prompt=model_input, num_samples=1, sampling_params=params
+            ).result()
+            print(f"  [Neosmith] Tinker SDK returned, output_tokens={len(result.sequences[0].tokens)}")
+        except Exception as e:
+            print(f"  [Neosmith] ERROR in Tinker SDK call: {type(e).__name__}: {e}")
+            raise
 
         # model_input is a token-id sequence → its length = input token count
         self.total_input_tokens  += len(model_input)
         self.total_output_tokens += len(result.sequences[0].tokens)
 
         parsed, _ = self._renderer.parse_response(result.sequences[0].tokens)
-        return self._renderers.get_text_content(parsed)
+        text = self._renderers.get_text_content(parsed)
+        print(f"  [Neosmith] Parsed response length={len(text) if text else 0}")
+        return text
 
     async def chat_completion(self, model, system, user, temperature=0.2, img_path=None):
+        print(f"  [Neosmith] chat_completion called (model param={model}, ignored — using Tinker SDK)")
         messages    = [{"role": "system", "content": system},
                        {"role": "user",   "content": user}]
         model_input = self._renderer.build_generation_prompt(messages)
@@ -167,6 +176,7 @@ class NeosmithHandler(BaseAiHandler):
             text = await loop.run_in_executor(
                 pool, self._blocking_sample, model_input, temperature
             )
+        print(f"  [Neosmith] chat_completion done, response_length={len(text) if text else 0}")
         return text, "stop"
 
 
