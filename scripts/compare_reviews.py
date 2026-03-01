@@ -297,7 +297,7 @@ async def main():
     gpt_improve, gpt_im_ms,  gpt_im_in,  gpt_im_out  = await run_improve(pr_url, GPTHandler)
     print(f"      {gpt_im_ms}ms  |  {gpt_im_in:,} in / {gpt_im_out:,} out tokens")
 
-    print(f"[3/4] Neosmith  /review  ...")
+    print(f"\n[3/4] Neosmith  /review  ...")
     neo_review,  neo_rv_ms,  neo_rv_in,  neo_rv_out  = await run_review(pr_url, NeosmithHandler)
     print(f"      {neo_rv_ms}ms  |  {neo_rv_in:,} in / {neo_rv_out:,} out tokens")
 
