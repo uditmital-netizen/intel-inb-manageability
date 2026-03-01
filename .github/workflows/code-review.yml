@@ -1,21 +1,26 @@
 name: Compare Reviews (GPT-5.2 vs Neosmith)
 
+# ── Triggers ──────────────────────────────────────────────────────────────────
 on:
+  # 1. Manual run from GitHub UI  →  Actions tab → "Run workflow"
+  #    You can optionally type a PR number; leave blank to use the latest open PR.
   workflow_dispatch:
     inputs:
       pr_number:
-        description: "PR number to compare (leave blank = latest open PR)"
+        description: "PR number to compare (leave blank for latest open PR)"
         required: false
         type: string
       openai_model:
-        description: "OpenAI model override"
+        description: "OpenAI model override (default: gpt-5.2-2025-12-11)"
         required: false
         default: "gpt-5.2-2025-12-11"
         type: string
 
+  # 2. Auto-run on every new PR or push to an open PR
   pull_request:
     types: [opened, synchronize, reopened]
 
+  # 3. Trigger by typing `/compare-reviews` in a PR comment
   issue_comment:
     types: [created]
 
@@ -26,6 +31,7 @@ permissions:
 
 jobs:
   compare_reviews:
+    # For issue_comment trigger, only run when comment is on a PR and contains the command
     if: |
       github.event_name == 'workflow_dispatch' ||
       github.event_name == 'pull_request' ||
@@ -37,6 +43,7 @@ jobs:
     name: GPT-5.2 vs Neosmith comparison
 
     steps:
+      # ── Resolve the PR URL from GitHub context ─────────────────────────────
       - name: Resolve PR URL
         id: pr_url
         env:
@@ -44,9 +51,11 @@ jobs:
           REPO: ${{ github.repository }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ]; then
+            # Automatically available from the PR event
             echo "url=${{ github.event.pull_request.html_url }}" >> "$GITHUB_OUTPUT"
 
           elif [ "${{ github.event_name }}" = "issue_comment" ]; then
+            # Comment on a PR — issue number == PR number on GitHub
             echo "url=https://github.com/${REPO}/pull/${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
 
           elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
@@ -54,6 +63,7 @@ jobs:
             if [ -n "$PR_NUM" ]; then
               echo "url=https://github.com/${REPO}/pull/${PR_NUM}" >> "$GITHUB_OUTPUT"
             else
+              # No number given — pick the most-recently-updated open PR
               LATEST=$(gh pr list --repo "$REPO" --state open --json number --jq '.[0].number')
               if [ -z "$LATEST" ]; then
                 echo "::error::No open PRs found and no pr_number supplied."
@@ -63,16 +73,14 @@ jobs:
             fi
           fi
 
+      - name: Show resolved PR URL
+        run: echo "Running compare_reviews.py against ${{ steps.pr_url.outputs.url }}"
+
+      # ── Checkout the repo (needed to run compare_reviews.py) ──────────────
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Checkout pr-agent as a dependency (for imports)
-      - name: Checkout qodo-ai/pr-agent
-        uses: actions/checkout@v4
-        with:
-          repository: qodo-ai/pr-agent
-          path: _pr_agent_lib
-
+      # ── Python setup ──────────────────────────────────────────────────────
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
@@ -82,15 +90,21 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install -e _pr_agent_lib/
+          pip install -e ".[test]" || pip install -e .
+          # dotenv for env loading inside the script
           pip install python-dotenv
 
+      # ── Run the comparison ─────────────────────────────────────────────────
       - name: Run compare_reviews.py
         env:
-          PR_URL:         ${{ steps.pr_url.outputs.url }}
-          GITHUB_TOKEN:   ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_KEY }}
-          OPENAI_MODEL:   ${{ inputs.openai_model || 'gpt-5.2-2025-12-11' }}
-          TINKER_API_KEY: ${{ secrets.TINKER_API_KEY }}
-          NEOSMITH_MODEL: ${{ vars.NEOSMITH_MODEL || 'gpt-oss-120b' }}
-        run: python scripts/compare_reviews.py --pr_url "$PR_URL" --openai_model "$OPENAI_MODEL"
+          PR_URL:          ${{ steps.pr_url.outputs.url }}
+          GITHUB_TOKEN:    ${{ secrets.GITHUB_TOKEN }}
+          OPENAI_API_KEY:  ${{ secrets.OPENAI_KEY }}
+          OPENAI_KEY:      ${{ secrets.OPENAI_KEY }}
+          OPENAI_MODEL:    ${{ inputs.openai_model || 'gpt-5.2-2025-12-11' }}
+          TINKER_API_KEY:  ${{ secrets.TINKER_API_KEY }}
+          NEOSMITH_MODEL:  ${{ vars.NEOSMITH_MODEL || 'gpt-oss-120b' }}
+        run: |
+          python compare_reviews.py \
+            --pr_url "$PR_URL" \
+            --openai_model "$OPENAI_MODEL"
