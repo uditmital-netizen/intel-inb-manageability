@@ -40,6 +40,7 @@ jobs:
 
     runs-on: ubuntu-latest
     name: GPT-5.2 vs Neosmith comparison
+    environment: OPENAI_API_KEY   # replace with your actual environment name
 
     steps:
       # ── Resolve the PR URL from GitHub context ─────────────────────────────
@@ -88,21 +89,37 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
+
+      # Cache the entire venv — keyed on pr-agent's pyproject.toml
+      # Cache hit = skip install entirely (saves ~2-3 min per run)
+      - name: Cache pr-agent venv
+        id: cache-venv
+        uses: actions/cache@v4
+        with:
+          path: _pr_agent_venv
+          key: pr-agent-venv-${{ runner.os }}-py3.12-${{ hashFiles('_pr_agent_lib/pyproject.toml', '_pr_agent_lib/requirements.txt') }}
 
       - name: Install pr-agent dependencies
+        if: steps.cache-venv.outputs.cache-hit != 'true'
         working-directory: _pr_agent_lib
         run: |
-          pip install --upgrade pip
-          pip install -e .
-          pip install python-dotenv
+          python -m venv ../_pr_agent_venv
+          ../_pr_agent_venv/bin/pip install --upgrade pip
+          ../_pr_agent_venv/bin/pip install -e .
+          ../_pr_agent_venv/bin/pip install python-dotenv
 
-      # ── Debug: verify secrets resolved ────────────────────────────────────
+      # ── Debug: check all possible secret name variants ────────────────────
       - name: Debug secret resolution
         run: |
-          echo "OPENAI_KEY set:     ${{ secrets.OPENAI_KEY != '' }}"
-          echo "TINKER_API_KEY set: ${{ secrets.TINKER_API_KEY != '' }}"
-          echo "GITHUB_TOKEN set:   ${{ secrets.GITHUB_TOKEN != '' }}"
+          echo "--- OpenAI key variants ---"
+          echo "secrets.OPENAI_KEY set:      ${{ secrets.OPENAI_KEY != '' }}"
+          echo "secrets.OPENAI_API_KEY set:  ${{ secrets.OPENAI_API_KEY != '' }}"
+          echo "secrets.OPENAI_SECRET set:   ${{ secrets.OPENAI_SECRET != '' }}"
+          echo "--- Tinker key variants ---"
+          echo "secrets.TINKER_API_KEY set:  ${{ secrets.TINKER_API_KEY != '' }}"
+          echo "secrets.TINKER_KEY set:      ${{ secrets.TINKER_KEY != '' }}"
+          echo "--- GitHub token ---"
+          echo "secrets.GITHUB_TOKEN set:    ${{ secrets.GITHUB_TOKEN != '' }}"
 
       # ── Run the comparison ─────────────────────────────────────────────────
       - name: Run compare_reviews.py
@@ -115,6 +132,6 @@ jobs:
           TINKER_API_KEY: ${{ secrets.TINKER_API_KEY }}
           NEOSMITH_MODEL: ${{ vars.NEOSMITH_MODEL || 'gpt-oss-120b' }}
         run: |
-          python scripts/compare_reviews.py \
+          _pr_agent_venv/bin/python scripts/compare_reviews.py \
             --pr_url "$PR_URL" \
             --openai_model "$OPENAI_MODEL"
