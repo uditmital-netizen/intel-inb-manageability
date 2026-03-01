@@ -107,6 +107,8 @@ jobs:
           ../_pr_agent_venv/bin/pip install --upgrade pip
           ../_pr_agent_venv/bin/pip install -e .
           ../_pr_agent_venv/bin/pip install python-dotenv
+          ../_pr_agent_venv/bin/pip install tinker
+          ../_pr_agent_venv/bin/pip install "tinker_cookbook @ git+https://github.com/thinking-machines-lab/tinker-cookbook.git"
 
       # ── Debug: check all possible secret name variants ────────────────────
       - name: Debug secret resolution
