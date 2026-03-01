@@ -113,23 +113,40 @@ class NeosmithHandler(BaseAiHandler):
     BASE_MODEL = "openai/gpt-oss-120b"
 
     def __init__(self):
-        import tinker
-        from tinker import types as tinker_types
-        from tinker_cookbook import model_info, renderers
-        from tinker_cookbook.tokenizer_utils import get_tokenizer
+        print("  [Neosmith] __init__ starting...")
+        try:
+            import tinker
+            from tinker import types as tinker_types
+            from tinker_cookbook import model_info, renderers
+            from tinker_cookbook.tokenizer_utils import get_tokenizer
+        except ImportError as e:
+            print(f"  [Neosmith] IMPORT ERROR: {e}")
+            raise
 
         api_key = os.environ.get("TINKER_API_KEY")
         if not api_key:
             raise ValueError("TINKER_API_KEY is not set")
+        print(f"  [Neosmith] TINKER_API_KEY present (length={len(api_key)})")
 
         self._types           = tinker_types
         self._renderers       = renderers
-        self._sampling_client = tinker.ServiceClient(api_key=api_key) \
-                                      .create_sampling_client(model_path=self.SAMPLER_PATH)
+        try:
+            self._sampling_client = tinker.ServiceClient(api_key=api_key) \
+                                          .create_sampling_client(model_path=self.SAMPLER_PATH)
+            print(f"  [Neosmith] Sampling client created OK")
+        except Exception as e:
+            print(f"  [Neosmith] ERROR creating sampling client: {type(e).__name__}: {e}")
+            raise
 
-        tokenizer     = get_tokenizer(self.BASE_MODEL)
-        renderer_name = model_info.get_recommended_renderer_name(self.BASE_MODEL) or "gpt_oss_system"
-        self._renderer = renderers.get_renderer(renderer_name, tokenizer)
+        try:
+            tokenizer     = get_tokenizer(self.BASE_MODEL)
+            renderer_name = model_info.get_recommended_renderer_name(self.BASE_MODEL) or "gpt_oss_system"
+            self._renderer = renderers.get_renderer(renderer_name, tokenizer)
+            print(f"  [Neosmith] Renderer created OK (renderer={renderer_name})")
+        except Exception as e:
+            print(f"  [Neosmith] ERROR creating renderer: {type(e).__name__}: {e}")
+            raise
+        print("  [Neosmith] __init__ complete")
 
         self.total_input_tokens  = 0
         self.total_output_tokens = 0
