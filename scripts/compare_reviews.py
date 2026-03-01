@@ -183,8 +183,10 @@ class NeosmithHandler(BaseAiHandler):
 
     async def chat_completion(self, model, system, user, temperature=0.2, img_path=None):
         print(f"  [Neosmith] chat_completion called (model param={model}, ignored — using Tinker SDK)")
-        messages    = [{"role": "system", "content": system},
-                       {"role": "user",   "content": user}]
+        # Renderer is gpt_oss_no_sysprompt — does NOT support system messages.
+        # Merge system prompt into the user message.
+        combined_user = f"{system}\n\n{user}" if system else user
+        messages    = [{"role": "user", "content": combined_user}]
         model_input = self._renderer.build_generation_prompt(messages)
 
         loop = asyncio.get_event_loop()
