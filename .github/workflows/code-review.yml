@@ -40,7 +40,7 @@ jobs:
 
     runs-on: ubuntu-latest
     name: GPT-5.2 vs Neosmith comparison
-    environment: OPENAI_API_KEY   # replace with your actual environment name
+    environment: OPENAI_API_KEY
 
     steps:
       # ── Resolve the PR URL from GitHub context ─────────────────────────────
@@ -126,12 +126,13 @@ jobs:
         env:
           PR_URL:         ${{ steps.pr_url.outputs.url }}
           GITHUB_TOKEN:   ${{ secrets.GITHUB_TOKEN }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_KEY }}
-          OPENAI_KEY:     ${{ secrets.OPENAI_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          OPENAI_KEY:     ${{ secrets.OPENAI_API_KEY }}
           OPENAI_MODEL:   ${{ inputs.openai_model || 'gpt-5.2-2025-12-11' }}
           TINKER_API_KEY: ${{ secrets.TINKER_API_KEY }}
           NEOSMITH_MODEL: ${{ vars.NEOSMITH_MODEL || 'gpt-oss-120b' }}
         run: |
           _pr_agent_venv/bin/python scripts/compare_reviews.py \
             --pr_url "$PR_URL" \
-            --openai_model "$OPENAI_MODEL"
+            --openai_model "$OPENAI_MODEL" \
+            --env_file /dev/null
