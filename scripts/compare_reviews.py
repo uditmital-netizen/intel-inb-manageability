@@ -191,7 +191,21 @@ class CapturingReviewer(PRReviewer):
             await self.run()
         finally:
             get_settings().config.publish_output = original
-        return self.captured_review or "(No review generated)"
+
+        # 1. Formatted markdown from _prepare_pr_review (if YAML parsed OK)
+        if self.captured_review:
+            return self.captured_review
+
+        # 2. Stored artifact (same path CapturingImprover uses)
+        data = get_settings().get("data", {})
+        if data.get("artifact"):
+            return data["artifact"]
+
+        # 3. Raw AI prediction (Neosmith may not output valid YAML)
+        if getattr(self, "prediction", None):
+            return self.prediction
+
+        return "(No review generated)"
 
 
 class CapturingImprover(PRCodeSuggestions):
