@@ -95,20 +95,17 @@ class GPTHandler(LiteLLMAIHandler):
 
 class NeosmithHandler(BaseAiHandler):
     """
-    Neosmith AI — RL-trained model (gpt-oss-120b, GRPO step-200).
+    Neosmith AI — RL-trained model (gpt-oss-120b, GRPO).
 
-    Currently backed by the Tinker SDK directly.
-    TODO: swap to a LiteLLM proxy endpoint once it's running:
-        resp = await litellm.acompletion(model=f"openai/{self.model_name}",
-                                         api_base=NEOSMITH_API_URL, ...)
-
-    Checkpoint:
-        tinker://ee92788e-a9ce-5c85-8612-df8d19f75f12:train:0/sampler_weights/final
+    Uses Tinker SDK for inference. Checkpoint configurable via NEOSMITH_CHECKPOINT env var.
+    Default: codereview-rl-tinker 400-step checkpoint trained with YAML format reward.
     """
 
-    SAMPLER_PATH = (
-        "tinker://ee92788e-a9ce-5c85-8612-df8d19f75f12"
-        ":train:0/sampler_weights/final"
+    # Configurable via NEOSMITH_CHECKPOINT env var
+    SAMPLER_PATH = os.environ.get(
+        "NEOSMITH_CHECKPOINT",
+        "tinker://e279bf03-4d98-5371-b86a-30d6d20d1aff"
+        ":train:0/sampler_weights/v1-rl-step250-codereview"
     )
     BASE_MODEL = "openai/gpt-oss-120b"
 
@@ -160,7 +157,7 @@ class NeosmithHandler(BaseAiHandler):
         print(f"  [Neosmith] _blocking_sample called, input_tokens={len(model_input)}")
         try:
             params = self._types.SamplingParams(
-                max_tokens=2048,
+                max_tokens=8192,
                 temperature=temperature,
                 stop=self._renderer.get_stop_sequences(),
             )
@@ -178,6 +175,18 @@ class NeosmithHandler(BaseAiHandler):
 
         parsed, _ = self._renderer.parse_response(result.sequences[0].tokens)
         text = self._renderers.get_text_content(parsed)
+
+        # Strip markdown yaml fences if model wraps output
+        if text:
+            stripped = text.strip()
+            if stripped.startswith("```yaml"):
+                stripped = stripped[7:]
+            elif stripped.startswith("```"):
+                stripped = stripped[3:]
+            if stripped.endswith("```"):
+                stripped = stripped[:-3]
+            text = stripped.strip()
+
         print(f"  [Neosmith] Parsed response length={len(text) if text else 0}")
         return text
 
