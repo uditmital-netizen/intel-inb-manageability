@@ -105,7 +105,7 @@ class NeosmithHandler(BaseAiHandler):
     SAMPLER_PATH = os.environ.get(
         "NEOSMITH_CHECKPOINT",
         "tinker://e279bf03-4d98-5371-b86a-30d6d20d1aff"
-        ":train:0/sampler_weights/v1-rl-step250-codereview"
+        ":train:0/sampler_weights/v1-rl-step250-codereview-yaml"
     )
     BASE_MODEL = "openai/gpt-oss-120b"
 
@@ -130,6 +130,8 @@ class NeosmithHandler(BaseAiHandler):
         try:
             self._sampling_client = tinker.ServiceClient(api_key=api_key) \
                                           .create_sampling_client(model_path=self.SAMPLER_PATH)
+
+            print(f"  [Neosmith] Sampling client created OK (model_path={self.SAMPLER_PATH})")
             print(f"  [Neosmith] Sampling client created OK")
         except Exception as e:
             print(f"  [Neosmith] ERROR creating sampling client: {type(e).__name__}: {e}")
