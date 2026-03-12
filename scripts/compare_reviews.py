@@ -107,6 +107,8 @@ class NeosmithHandler(BaseAiHandler):
         "tinker://e279bf03-4d98-5371-b86a-30d6d20d1aff"
         ":train:0/sampler_weights/v1-rl-step250-codereview-yaml"
     )
+    SAMPLER_PATH = " tinker://e279bf03-4d98-5371-b86a-30d6d20d1aff:train:0/sampler_weights/v1-rl-step250-codereview"
+
     BASE_MODEL = "openai/gpt-oss-120b"
 
     def __init__(self):
