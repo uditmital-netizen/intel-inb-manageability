@@ -341,25 +341,26 @@ async def main():
     get_settings().set("CONFIG.MODEL",        openai_model)
 
     print(f"\n  pr       : {pr_url}")
-    print(f"  gpt-5.2  : {openai_model}")
     print(f"  neosmith : {neo_model} (Tinker SDK)")
+    print(f"  endpoint : {NeosmithHandler.SAMPLER_PATH}")
+    print(f"  gpt-5.2  : {openai_model}")
 
-    # ── Run all 4 tasks ───────────────────────────────────────────────────────
-    print(f"\n[1/4] GPT-5.2   /review  ...")
-    gpt_review,  gpt_rv_ms,  gpt_rv_in,  gpt_rv_out  = await run_review(pr_url, GPTHandler)
-    print(f"      {gpt_rv_ms}ms  |  {gpt_rv_in:,} in / {gpt_rv_out:,} out tokens")
-
-    print(f"[2/4] GPT-5.2   /improve ...")
-    gpt_improve, gpt_im_ms,  gpt_im_in,  gpt_im_out  = await run_improve(pr_url, GPTHandler)
-    print(f"      {gpt_im_ms}ms  |  {gpt_im_in:,} in / {gpt_im_out:,} out tokens")
-
-    print(f"\n[3/4] Neosmith  /review  ...")
+    # ── Run all 4 tasks (Neosmith first) ─────────────────────────────────────
+    print(f"\n[1/4] Neosmith  /review  ...")
     neo_review,  neo_rv_ms,  neo_rv_in,  neo_rv_out  = await run_review(pr_url, NeosmithHandler)
     print(f"      {neo_rv_ms}ms  |  {neo_rv_in:,} in / {neo_rv_out:,} out tokens")
 
-    print(f"[4/4] Neosmith  /improve ...")
+    print(f"[2/4] Neosmith  /improve ...")
     neo_improve, neo_im_ms,  neo_im_in,  neo_im_out  = await run_improve(pr_url, NeosmithHandler)
     print(f"      {neo_im_ms}ms  |  {neo_im_in:,} in / {neo_im_out:,} out tokens")
+
+    print(f"\n[3/4] GPT-5.2   /review  ...")
+    gpt_review,  gpt_rv_ms,  gpt_rv_in,  gpt_rv_out  = await run_review(pr_url, GPTHandler)
+    print(f"      {gpt_rv_ms}ms  |  {gpt_rv_in:,} in / {gpt_rv_out:,} out tokens")
+
+    print(f"[4/4] GPT-5.2   /improve ...")
+    gpt_improve, gpt_im_ms,  gpt_im_in,  gpt_im_out  = await run_improve(pr_url, GPTHandler)
+    print(f"      {gpt_im_ms}ms  |  {gpt_im_in:,} in / {gpt_im_out:,} out tokens")
 
     # ── Aggregate totals ──────────────────────────────────────────────────────
     gpt_total_ms  = gpt_rv_ms  + gpt_im_ms
@@ -415,12 +416,12 @@ async def main():
 
     # ── GitHub comment ────────────────────────────────────────────────────────
     comment = f"""\
-## 🔬 PR Analysis: GPT-5.2 vs Neosmith AI
+## 🔬 PR Analysis: Neosmith AI vs GPT-5.2
 
-| | Model | Type |
-|---|---|---|
-| 🤖 **GPT-5.2** | `{openai_model}` | Standard OpenAI |
-| 🚀 **Neosmith** | `{neo_model}` | RL-trained · GRPO · step-200 |
+| | Model | Type | Endpoint |
+|---|---|---|---|
+| 🚀 **Neosmith** | `{neo_model}` | RL-trained · GRPO · step-250 | `{NeosmithHandler.SAMPLER_PATH}` |
+| 🤖 **GPT-5.2** | `{openai_model}` | Standard OpenAI | — |
 
 ---
 
@@ -438,15 +439,15 @@ async def main():
 
 ## `/review` Results
 
-### 🤖 GPT-5.2 Review
-
-{gpt_review}
-
----
-
 ### 🚀 Neosmith Review
 
 {neo_review}
+
+---
+
+### 🤖 GPT-5.2 Review
+
+{gpt_review}
 
 <details>
 <summary>Review diff — lines Neosmith changed vs GPT-5.2</summary>
@@ -458,15 +459,15 @@ async def main():
 
 ## `/improve` Results
 
-### 🤖 GPT-5.2 Code Suggestions
-
-{gpt_improve}
-
----
-
 ### 🚀 Neosmith Code Suggestions
 
 {neo_improve}
+
+---
+
+### 🤖 GPT-5.2 Code Suggestions
+
+{gpt_improve}
 
 <details>
 <summary>Improve diff — lines Neosmith changed vs GPT-5.2</summary>
@@ -475,9 +476,10 @@ async def main():
 </details>
 """
 
-    print(f"\n  GPT-5.2  cost : ${gpt_total_cost:.4f}")
-    print(f"  Neosmith cost : ${neo_total_cost:.4f}")
+    print(f"\n  Neosmith cost : ${neo_total_cost:.4f}")
+    print(f"  GPT-5.2  cost : ${gpt_total_cost:.4f}")
     print(f"  Savings       : ${savings:.4f} ({savings_pct:.0f}%)")
+    print(f"  Tinker endpoint: {NeosmithHandler.SAMPLER_PATH}")
 
     print("\nPosting comparison comment to PR ...")
     from pr_agent.git_providers import get_git_provider_with_context
