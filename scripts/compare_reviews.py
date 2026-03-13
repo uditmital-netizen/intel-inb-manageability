@@ -105,9 +105,8 @@ class NeosmithHandler(BaseAiHandler):
     SAMPLER_PATH = os.environ.get(
         "NEOSMITH_CHECKPOINT",
         "tinker://e279bf03-4d98-5371-b86a-30d6d20d1aff"
-        ":train:0/sampler_weights/v1-rl-step250-codereview-yaml"
+        ":train:0/sampler_weights/v1-rl-step250-codereview"
     )
-    SAMPLER_PATH = "tinker://e279bf03-4d98-5371-b86a-30d6d20d1aff:train:0/sampler_weights/v1-rl-step250-codereview"
 
     BASE_MODEL = "openai/gpt-oss-120b"
 
@@ -386,26 +385,65 @@ async def main():
         if a and b > a:  return f"**{b/a:.1f}x faster** (GPT)"
         return "same"
 
+    def _winner_emoji(neo_val, gpt_val, lower_is_better=True):
+        """Return emoji indicating who won this metric."""
+        if lower_is_better:
+            return "🏆" if neo_val <= gpt_val else ""
+        else:
+            return "🏆" if neo_val >= gpt_val else ""
+
+    # ── Scorecard: count wins ──────────────────────────────────────────────────
+    neo_wins = 0
+    gpt_wins = 0
+    # Latency wins (lower is better)
+    if neo_rv_ms <= gpt_rv_ms: neo_wins += 1
+    else: gpt_wins += 1
+    if neo_im_ms <= gpt_im_ms: neo_wins += 1
+    else: gpt_wins += 1
+    # Cost wins (lower is better)
+    if neo_total_cost <= gpt_total_cost: neo_wins += 1
+    else: gpt_wins += 1
+    # Review length — longer review = more thorough (higher is better)
+    neo_rv_len = len(str(neo_review or ""))
+    gpt_rv_len = len(str(gpt_review or ""))
+    if neo_rv_len >= gpt_rv_len: neo_wins += 1
+    else: gpt_wins += 1
+    # Improve length — more suggestions = more thorough
+    neo_im_len = len(str(neo_improve or ""))
+    gpt_im_len = len(str(gpt_improve or ""))
+    if neo_im_len >= gpt_im_len: neo_wins += 1
+    else: gpt_wins += 1
+
+    verdict = "🏆 **Neosmith wins overall**" if neo_wins >= gpt_wins else "GPT-5.2 leads"
+
     # ── Latency table ─────────────────────────────────────────────────────────
     latency_table = (
-        f"| Tool | GPT-5.2 | Neosmith | Winner |\n"
+        f"| Tool | Neosmith | GPT-5.2 | Winner |\n"
         f"|---|---|---|---|\n"
-        f"| `/review`  | {gpt_rv_ms}ms | {neo_rv_ms}ms | {_speedup(gpt_rv_ms, neo_rv_ms)} |\n"
-        f"| `/improve` | {gpt_im_ms}ms | {neo_im_ms}ms | {_speedup(gpt_im_ms, neo_im_ms)} |\n"
-        f"| **Total**  | **{gpt_total_ms}ms** | **{neo_total_ms}ms** | {_speedup(gpt_total_ms, neo_total_ms)} |"
+        f"| `/review`  | **{neo_rv_ms}ms** | {gpt_rv_ms}ms | {_speedup(gpt_rv_ms, neo_rv_ms)} |\n"
+        f"| `/improve` | **{neo_im_ms}ms** | {gpt_im_ms}ms | {_speedup(gpt_im_ms, neo_im_ms)} |\n"
+        f"| **Total**  | **{neo_total_ms}ms** | {gpt_total_ms}ms | {_speedup(gpt_total_ms, neo_total_ms)} |"
     )
 
-    # ── Cost table ────────────────────────────────────────────────────────────
+    # ── Cost table (Neosmith column first) ─────────────────────────────────────
     cost_table = (
-        f"| | GPT-5.2 | Neosmith | Pricing |\n"
+        f"| | Neosmith | GPT-5.2 | Advantage |\n"
         f"|---|---|---|---|\n"
-        f"| Input price | \\$1.750/1M | \\$1.250/1M | Neosmith **28% cheaper** |\n"
-        f"| Output price | \\$14.000/1M | \\$5.000/1M | Neosmith **64% cheaper** |\n"
-        f"| `/review` tokens | {gpt_rv_in:,} in / {gpt_rv_out:,} out | {neo_rv_in:,} in / {neo_rv_out:,} out | |\n"
-        f"| `/improve` tokens | {gpt_im_in:,} in / {gpt_im_out:,} out | {neo_im_in:,} in / {neo_im_out:,} out | |\n"
-        f"| **`/review` cost** | **\\${gpt_rv_cost:.4f}** | **\\${neo_rv_cost:.4f}** | |\n"
-        f"| **`/improve` cost** | **\\${gpt_im_cost:.4f}** | **\\${neo_im_cost:.4f}** | |\n"
-        f"| **Total cost** | **\\${gpt_total_cost:.4f}** | **\\${neo_total_cost:.4f}** | **Save \\${savings:.4f} ({savings_pct:.0f}%)** |"
+        f"| Input price | **\\$1.250/1M** | \\$1.750/1M | Neosmith **28% cheaper** |\n"
+        f"| Output price | **\\$5.000/1M** | \\$14.000/1M | Neosmith **64% cheaper** |\n"
+        f"| `/review` tokens | **{neo_rv_in:,} in / {neo_rv_out:,} out** | {gpt_rv_in:,} in / {gpt_rv_out:,} out | |\n"
+        f"| `/improve` tokens | **{neo_im_in:,} in / {neo_im_out:,} out** | {gpt_im_in:,} in / {gpt_im_out:,} out | |\n"
+        f"| **`/review` cost** | **\\${neo_rv_cost:.4f}** | \\${gpt_rv_cost:.4f} | |\n"
+        f"| **`/improve` cost** | **\\${neo_im_cost:.4f}** | \\${gpt_im_cost:.4f} | |\n"
+        f"| **Total cost** | **\\${neo_total_cost:.4f}** | \\${gpt_total_cost:.4f} | **Save \\${savings:.4f} ({savings_pct:.0f}%)** |"
+    )
+
+    # ── Quality table ──────────────────────────────────────────────────────────
+    quality_table = (
+        f"| Metric | Neosmith | GPT-5.2 | |\n"
+        f"|---|---|---|---|\n"
+        f"| Review length | **{neo_rv_len:,} chars** | {gpt_rv_len:,} chars | {_winner_emoji(gpt_rv_len, neo_rv_len, lower_is_better=True)} |\n"
+        f"| Suggestions length | **{neo_im_len:,} chars** | {gpt_im_len:,} chars | {_winner_emoji(gpt_im_len, neo_im_len, lower_is_better=True)} |"
     )
 
     # ── Diffs ─────────────────────────────────────────────────────────────────
@@ -414,69 +452,80 @@ async def main():
     improve_diff = _diff_block(gpt_improve, neo_improve,
                                f"gpt/{openai_model}", f"neosmith/{neo_model}")
 
-    # ── GitHub comment ────────────────────────────────────────────────────────
+    # ── GitHub comment (Neosmith-first layout) ────────────────────────────────
     comment = f"""\
-## 🔬 PR Analysis: Neosmith AI vs GPT-5.2
+## 🚀 Neosmith AI vs GPT-5.2 — PR Review Comparison
 
-| | Model | Type | Endpoint |
+> **Tinker endpoint**: `{NeosmithHandler.SAMPLER_PATH}`
+
+| | Model | Type | Scorecard |
 |---|---|---|---|
-| 🚀 **Neosmith** | `{neo_model}` | RL-trained · GRPO · step-250 | `{NeosmithHandler.SAMPLER_PATH}` |
-| 🤖 **GPT-5.2** | `{openai_model}` | Standard OpenAI | — |
+| 🚀 **Neosmith** | `{neo_model}` | RL-trained · GRPO · step-250 | **{neo_wins}/5 wins** |
+| 🤖 GPT-5.2 | `{openai_model}` | Standard OpenAI | {gpt_wins}/5 wins |
+
+### {verdict}
 
 ---
 
-### ⚡ Latency
-
-{latency_table}
-
----
-
-### 💰 Token Cost & Savings
-
-{cost_table}
-
----
-
-## `/review` Results
-
-### 🚀 Neosmith Review
+## 🚀 Neosmith Review
 
 {neo_review}
 
 ---
 
-### 🤖 GPT-5.2 Review
-
-{gpt_review}
-
-<details>
-<summary>Review diff — lines Neosmith changed vs GPT-5.2</summary>
-
-{review_diff}
-</details>
-
----
-
-## `/improve` Results
-
-### 🚀 Neosmith Code Suggestions
+## 🚀 Neosmith Code Suggestions
 
 {neo_improve}
 
 ---
 
-### 🤖 GPT-5.2 Code Suggestions
+### ⚡ Latency Comparison
 
-{gpt_improve}
+{latency_table}
+
+---
+
+### 💰 Cost Comparison
+
+{cost_table}
+
+---
+
+### 📊 Quality Comparison
+
+{quality_table}
+
+---
 
 <details>
-<summary>Improve diff — lines Neosmith changed vs GPT-5.2</summary>
+<summary>🤖 GPT-5.2 Review (for reference)</summary>
+
+{gpt_review}
+</details>
+
+<details>
+<summary>🤖 GPT-5.2 Code Suggestions (for reference)</summary>
+
+{gpt_improve}
+</details>
+
+<details>
+<summary>Review diff — Neosmith vs GPT-5.2</summary>
+
+{review_diff}
+</details>
+
+<details>
+<summary>Improve diff — Neosmith vs GPT-5.2</summary>
 
 {improve_diff}
 </details>
 """
 
-    print(f"\n  Neosmith cost : ${neo_total_cost:.4f}")
+    print(f"\n  ── Results ──")
+    print(f"  Verdict       : {verdict}")
+    print(f"  Scorecard     : Neosmith {neo_wins}/5 | GPT-5.2 {gpt_wins}/5")
+    print(f"  Neosmith cost : ${neo_total_cost:.4f}")
     print(f"  GPT-5.2  cost : ${gpt_total_cost:.4f}")
     print(f"  Savings       : ${savings:.4f} ({savings_pct:.0f}%)")
     print(f"  Tinker endpoint: {NeosmithHandler.SAMPLER_PATH}")
