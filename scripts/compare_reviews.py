@@ -150,6 +150,7 @@ class NeosmithHandler(BaseAiHandler):
 
         self.total_input_tokens  = 0
         self.total_output_tokens = 0
+        self._last_response = None   # store last raw response for fallback
 
     @property
     def deployment_id(self):
@@ -157,7 +158,12 @@ class NeosmithHandler(BaseAiHandler):
 
     def _blocking_sample(self, model_input, temperature: float) -> str:
         """Synchronous Tinker call — runs in a thread pool."""
-        print(f"  [Neosmith] _blocking_sample called, input_tokens={len(model_input)}")
+        # model_input is a ModelInput with multiple chunks
+        if hasattr(model_input, 'chunks'):
+            input_len = sum(len(c.tokens) for c in model_input.chunks)
+        else:
+            input_len = 0
+        print(f"  [Neosmith] _blocking_sample called, input_tokens={input_len}")
         try:
             params = self._types.SamplingParams(
                 max_tokens=8192,
@@ -172,12 +178,28 @@ class NeosmithHandler(BaseAiHandler):
             print(f"  [Neosmith] ERROR in Tinker SDK call: {type(e).__name__}: {e}")
             raise
 
-        # model_input is a token-id sequence → its length = input token count
-        self.total_input_tokens  += len(model_input)
-        self.total_output_tokens += len(result.sequences[0].tokens)
+        out_tokens = result.sequences[0].tokens
+        self.total_input_tokens  += input_len
+        self.total_output_tokens += len(out_tokens)
 
-        parsed, _ = self._renderer.parse_response(result.sequences[0].tokens)
-        text = self._renderers.get_text_content(parsed)
+        # Try renderer parse first
+        text = None
+        try:
+            parsed, _ = self._renderer.parse_response(out_tokens)
+            text = self._renderers.get_text_content(parsed)
+        except Exception as e:
+            print(f"  [Neosmith] Renderer parse failed: {e}")
+
+        # Fallback to raw token decode
+        if not text:
+            from tinker_cookbook.tokenizer_utils import get_tokenizer
+            tokenizer = get_tokenizer(self.BASE_MODEL)
+            text = tokenizer.decode(out_tokens)
+            # Strip special tokens from raw decode
+            for prefix in ("<|channel|>final<|message|>", "<|channel|>", "<|message|>"):
+                if text.startswith(prefix):
+                    text = text[len(prefix):]
+            print(f"  [Neosmith] Used raw decode fallback ({len(text)} chars)")
 
         # Strip markdown yaml fences if model wraps output
         if text:
@@ -190,7 +212,8 @@ class NeosmithHandler(BaseAiHandler):
                 stripped = stripped[:-3]
             text = stripped.strip()
 
-        print(f"  [Neosmith] Parsed response length={len(text) if text else 0}")
+        self._last_response = text
+        print(f"  [Neosmith] Final response length={len(text) if text else 0}")
         return text
 
     async def chat_completion(self, model, system, user, temperature=0.2, img_path=None):
@@ -230,6 +253,8 @@ class CapturingReviewer(PRReviewer):
         get_settings().config.publish_output = False
         try:
             await self.run()
+        except Exception as e:
+            print(f"  [CapturingReviewer] run() raised: {type(e).__name__}: {e}")
         finally:
             get_settings().config.publish_output = original
 
@@ -237,14 +262,21 @@ class CapturingReviewer(PRReviewer):
         if self.captured_review:
             return self.captured_review
 
-        # 2. Stored artifact (same path CapturingImprover uses)
-        data = get_settings().get("data", {})
-        if data.get("artifact"):
+        # 2. Stored artifact
+        data = getattr(get_settings(), "data", None)
+        if isinstance(data, dict) and data.get("artifact"):
             return data["artifact"]
 
-        # 3. Raw AI prediction (Neosmith may not output valid YAML)
-        if getattr(self, "prediction", None):
-            return self.prediction
+        # 3. Raw AI prediction (Neosmith returns markdown, not YAML)
+        raw = getattr(self, "prediction", None)
+        if raw:
+            print(f"  [CapturingReviewer] Using raw prediction ({len(raw)} chars)")
+            return raw
+
+        # 4. Check ai_handler for last response
+        handler = getattr(self, "ai_handler", None)
+        if handler and hasattr(handler, "_last_response") and handler._last_response:
+            return handler._last_response
 
         return "(No review generated)"
 
@@ -255,10 +287,28 @@ class CapturingImprover(PRCodeSuggestions):
         get_settings().config.publish_output = False
         try:
             await self.run()
+        except Exception as e:
+            print(f"  [CapturingImprover] run() raised: {type(e).__name__}: {e}")
         finally:
             get_settings().config.publish_output = original
-        data = get_settings().get("data", {})
-        return data.get("artifact", "(No suggestions generated)")
+
+        # 1. Stored artifact
+        data = getattr(get_settings(), "data", None)
+        if isinstance(data, dict) and data.get("artifact"):
+            return data["artifact"]
+
+        # 2. Raw AI prediction (Neosmith returns markdown, not YAML)
+        raw = getattr(self, "prediction", None)
+        if raw:
+            print(f"  [CapturingImprover] Using raw prediction ({len(raw)} chars)")
+            return raw
+
+        # 3. Check prediction_list for extended mode
+        plist = getattr(self, "prediction_list", None)
+        if plist:
+            return "\n\n---\n\n".join(str(p) for p in plist if p)
+
+        return "(No suggestions generated)"
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -460,7 +510,7 @@ async def main():
 
 | | Model | Type | Scorecard |
 |---|---|---|---|
-| 🚀 **Neosmith** | `{neo_model}` | RL-trained · GRPO · step-250 | **{neo_wins}/5 wins** |
+| 🚀 **Neosmith** | `{neo_model}` | RL-trained · GRPO | **{neo_wins}/5 wins** |
 | 🤖 GPT-5.2 | `{openai_model}` | Standard OpenAI | {gpt_wins}/5 wins |
 
 ### {verdict}
