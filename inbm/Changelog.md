@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 ### Added
 
 ### Fixed
+ - RTC 539880 - Fix encountered disconnected with code 7 after successfully provision to Azure cloud
 
 - Fix tar extraction weakness which failed to resolve path traversal issues caused by symbolic and hard links.
 
