@@ -266,6 +266,9 @@ Fixed identified security issues in the github workflow files identified by zizm
 
 - Bump golang.org/x/net from 0.17.0 to 0.23.0 in /inbm/trtl resolving detected 3rd party CVE: CVE-2023-45288
 
+## Changed
+ - Moved service files from /lib to /usr/lib for all Linux OSes
+
 ## 4.2.2 - 2024-03-26
 
 ### Changed
