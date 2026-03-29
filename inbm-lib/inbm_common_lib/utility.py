@@ -188,6 +188,34 @@ def canonicalize_uri(url: str) -> CanonicalUri:
 
     return CanonicalUri(value=url_normalize.url_normalize(url))
 
+def is_within_directory(directory: str, target: str) -> bool:
+    """Check if target is within directory
+    
+    @param directory: directory to check
+    @param target: target to check
+    @return whether target is within directory
+    """
+
+    abs_directory = os.path.abspath(directory)
+    abs_target = os.path.abspath(target)
+
+    prefix = os.path.commonprefix([abs_directory, abs_target])
+
+    return prefix == abs_directory
+
+def safe_extract(tarball: tarfile.TarFile, path=".", members=None, *, numeric_owner=False):
+    """Avoid path traversal when extracting tarball
+
+    @param tarball: tarball to extract
+    @param path: path to extract to
+    @param members: members to extract
+    @param numeric_owner: whether to extract numeric owner
+    """
+    for member in tarball.getmembers():
+        member_path = os.path.join(path, member.name)
+        if not is_within_directory(path, member_path):
+            raise IOError("Attempted Path Traversal in Tar File")
+    tarball.extractall(path, members, numeric_owner=numeric_owner) 
 
 def is_within_directory(directory: str, target: str) -> bool:
     """Check if target is within directory

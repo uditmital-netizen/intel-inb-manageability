@@ -478,6 +478,9 @@ NOTE: update log path has changed to /var/log/inbm-update-status.log
 - Bump cryptography from 3.4.8 to 30.9.1 in /inbm/dispatcher-agent
 - RTC 526357 - security.md file for SDL CT256
 
+### Security
+ - Harden tarfile extraction against path traversal attacks
+
 ## 3.0.14 - 2022-11-07
 
 ### Fixed
