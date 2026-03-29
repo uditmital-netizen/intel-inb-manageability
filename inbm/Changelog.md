@@ -14,6 +14,9 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/en/1.0.0/).
 
 - Fix tar extraction weakness which failed to resolve path traversal issues caused by symbolic and hard links.
 
+### Fixed
+ - (NEXMANAGE-746) Add extra sleeptime in INBM tpm script to resolve ARL platform issue
+
 ### Security
 
 Fixed identified security issues in the github workflow files identified by zizmor tool.
