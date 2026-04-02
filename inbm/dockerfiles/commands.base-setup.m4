@@ -16,6 +16,8 @@ RUN apt-get update && \
     rpm \
     wget \
     unzip \
+    libdbus-1-dev \
+    libglib2.0-dev \
     git && \
     apt-get clean
 RUN gem install public_suffix -v 5.1.1
